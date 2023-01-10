@@ -12,7 +12,6 @@ import coffeeBank.coffeeBank.member.util.MemberEmail;
 import coffeeBank.coffeeBank.member.util.MemberMapper;
 import coffeeBank.coffeeBank.member.util.MemberPassword;
 import coffeeBank.coffeeBank.utility.CommonUtils;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -39,13 +38,9 @@ public class MemberController {
     }
 
     @PostMapping("/member/signup")
-    public ResponseEntity<?> signup(
-            @RequestBody MemberRequest memberRequest,
-            HttpServletRequest request
-    ) {
-        if (MemberEmail.isDuplicateEmail(
-                memberService.getMemberEntity(memberRequest.getEmail())
-        )) {
+    public ResponseEntity<?> signup(@RequestBody MemberRequest memberRequest) {
+        Member requestMember = memberService.getMemberEntity(memberRequest.getEmail());
+        if (MemberEmail.isDuplicateEmail(requestMember)) {
             log.info("이메일이 중복됨.");
             return ResponseEntity.ok("중복되는 이메일이 있어 회원가입이 불가능합니다.");
         }
@@ -71,10 +66,9 @@ public class MemberController {
             return ResponseEntity.ok("회원 조회가 되지않아 로그인이 불가능합니다.");
         }
 
-        if (MemberPassword.isNotMatchingPassword(
-                memberRequest.getPassword(),
-                member.getPassword()
-        )) {
+        String inputPw = memberRequest.getPassword();
+        String originalPw = member.getPassword();
+        if (MemberPassword.isNotMatchingPassword(inputPw, originalPw)) {
             log.info("비밀번호가 일치하지 않음.");
             return ResponseEntity.ok("비밀번호가 다릅니다. 다시 시도하세요.");
         }
@@ -102,28 +96,25 @@ public class MemberController {
             @RequestBody ChangeEmailRequest changeEmailRequest,
             Principal principal
     ) {
-        Member member = memberService.getMemberEntity(principal.getName());
+        String email = principal.getName();
+        String requestEmail = changeEmailRequest.getEmail();
+        Member member = memberService.getMemberEntity(email);
+        Member requestMember = memberService.getMemberEntity(requestEmail);
 
-        if (MemberEmail.isDuplicateEmail(
-                memberService.getMemberEntity(changeEmailRequest.getEmail())
-        )) {
+        if (MemberEmail.isDuplicateEmail(requestMember)) {
             log.info("이메일이 중복됨.");
             return ResponseEntity
                     .ok("해당 이메일이 이미 존재합니다. 다시 입력해주세요");
         }
 
-        if (MemberPassword.isNotMatchingPassword(
-                changeEmailRequest.getPassword(),
-                member.getPassword()
-        )) {
+        String inputPw = changeEmailRequest.getPassword();
+        String originalPw = member.getPassword();
+        if (MemberPassword.isNotMatchingPassword(inputPw, originalPw)) {
             log.info("비밀번호 일치하지 않음.");
             return ResponseEntity.ok("비밀번호가 다릅니다. 다시 입력해주세요.");
         }
 
-        memberService.updateEmail(
-                principal.getName(),
-                changeEmailRequest.getEmail()
-        );
+        memberService.updateEmail(email, requestEmail);
         log.info("이메일 변경 성공");
 
         return ResponseEntity.ok("이메일이 변경되었습니다.");
@@ -132,23 +123,21 @@ public class MemberController {
     @PutMapping("/member/change-password")
     public ResponseEntity<?> changePassword(
             @RequestBody ChangePasswordRequest changePasswordRequest,
-            Principal principal,
-            HttpServletRequest request
+            Principal principal
     ) {
-        Member member = memberService.getMemberEntity(principal.getName());
+        String email = principal.getName();
+        Member member = memberService.getMemberEntity(email);
 
-        if (MemberPassword.isNotMatchingPassword(
-                changePasswordRequest.getOldPassword(),
-                member.getPassword()
-        )) {
+        String inputPw = changePasswordRequest.getOldPassword();
+        String originalPw = member.getPassword();
+        if (MemberPassword.isNotMatchingPassword(inputPw, originalPw)) {
             log.info("비밀번호 일치하지 않음.");
             return ResponseEntity.ok("비밀번호가 다릅니다. 다시 입력해주세요.");
         }
 
-        memberService.updatePassword(
-                member.getId(),
-                changePasswordRequest.getNewPassword()
-        );
+        Long memberId = member.getId();
+        String requestPw = changePasswordRequest.getNewPassword();
+        memberService.updatePassword(memberId, requestPw);
         log.info("비밀번호 변경 성공");
 
         return ResponseEntity.ok("비밀번호가 변경되었습니다.");
@@ -176,7 +165,7 @@ public class MemberController {
     public ResponseEntity<?> admin(Principal principal) {
         Member member = memberService.getMemberEntity(principal.getName());
 
-        if (!member.getAuth().equals(Role.ADMIN)) {  //권한 검증
+        if (!member.getAuth().equals(Role.ADMIN)) {
             log.info("어드민 페이지 접속에 실패했습니다.");
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED).build();
