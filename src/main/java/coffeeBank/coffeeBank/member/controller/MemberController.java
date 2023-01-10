@@ -66,10 +66,17 @@ public class MemberController {
             return ResponseEntity.ok("회원 조회가 되지않아 로그인이 불가능합니다.");
         }
 
+        if (member.getBlockCount() == 5) {
+            memberService.blockMember(email);
+            log.info("임시 정지 되었습니다.");
+            return ResponseEntity.ok("회원님의 계정은 임시 정지되었습니다.");
+        }
+
         String inputPw = memberRequest.getPassword();
         String originalPw = member.getPassword();
         if (MemberPassword.isNotMatchingPassword(inputPw, originalPw)) {
             log.info("비밀번호가 일치하지 않음.");
+            memberService.updateBlockCount(email);
             return ResponseEntity.ok("비밀번호가 다릅니다. 다시 시도하세요.");
         }
 
